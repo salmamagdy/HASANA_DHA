@@ -1,0 +1,1668 @@
+DROP VIEW REPORTNG.V_COVID_DHA;
+
+CREATE OR REPLACE FORCE VIEW REPORTNG.V_COVID_DHA
+(INVESTIGATION, "SUBJECT ID", "Case Code", "Salama MRN", "Full Name", 
+ EMIRATES_ID, AGE, "Sex", NATIONALITY, "Travel History", 
+ "Travel Country", "Airline", "Flight No", "Arrival Date", "DATE of OnSet", 
+ "Case Classification", "1st positive PCR Sample Date", "Confirmation Date", CLASSIFICATION_DATE, "3rd Last PCR Sample Date", 
+ "3rd Last PCR Result", "2nd Last PCR Sample Date", "2nd Last PCR Result", "1rd Last PCR Sample Date", "1st Last PCR Result", 
+ "Disease status", "Clinical Condition", "Admission disposition original", "Current Status", "Current Location", 
+ ADMISSION_DISPOSITION, ADT_ID, INTV_ID, "Admission Type Original", "Located at Home", 
+ "Admission Date", "Current Admission Location", "DISCHARGE STATUS", "Discharge Date", "START DISEASE PERIOD", 
+ "End Disease Period", SECOND_NEGATIVE_RES_DATE, "Most Recent Outcome", "OutCome", "OUTCOME Original", 
+ "OutCome Date", "UAE Residency", "Passport Number", "PASSPORT No", COMOBRID, 
+ "Occupation", "Address", EMIRATE, CITY, DISTRICT, 
+ AREA, MAKANI, "Telephone Number/s ", "Health care Worker/related", "Health care Facility", 
+ "Airline Employee", "Airline Employee/related", "Detection Facility/point", "Additional Notes", DEATH_DATE, 
+ CAUSE_OF_DEATH)
+AS 
+SELECT   INVESTIGATION,
+            TO_CHAR (SUBJECT_ID) AS "SUBJECT ID",
+            CASE_CODE AS "Case Code",
+            Salama_MRN AS "Salama MRN",
+            FULL_NAME AS "Full Name",
+            EMIRATES_ID,
+            TO_CHAR(CASE
+                       WHEN BOD IS NULL
+                       THEN
+                          NULL
+                       ELSE
+                          (TRUNC(MONTHS_BETWEEN (SYSDATE, NVL (BOD, SYSDATE))
+                                 / 12))
+                    END)
+               AS Age,
+            GENDER AS "Sex",
+            NATIONALITY,
+            TRAVEL_HISTORY AS "Travel History",
+            TRAVEL_COUNTRY AS "Travel Country",
+            airlinedetails AS "Airline",
+            flightdetails AS "Flight No",
+            TO_DATE (TO_CHAR (ARRIVAL_DATE1, 'DD-MON-RRRR'), 'DD-MON-RRRR')
+               AS "Arrival Date",
+            TO_DATE (TO_CHAR (ONSET_DATE, 'DD-MON-RRRR'), 'DD-MON-RRRR')
+               AS "DATE of OnSet",
+            Test_Reason AS "Case Classification",
+            first_positive_pcr_d AS "1st positive PCR Sample Date",
+            TO_DATE (
+               TO_CHAR (NVL (first_positive_res_d, CLASSIFICATION_DATE),
+                        'DD-MON-RRRR'),
+               'DD-MON-RRRR'
+            )
+               AS "Confirmation Date",
+            CLASSIFICATION_DATE,
+            FIRST_LAST_SPECIMEN_DATE AS "3rd Last PCR Sample Date",
+            FIRST_LAST_RESULT AS "3rd Last PCR Result",
+            SECOND_LAST_SPECIMEN_DATE AS "2nd Last PCR Sample Date",
+            SECOND_LAST_RESULT AS "2nd Last PCR Result",
+            THIRD_LAST_SPECIMEN_DATE AS "1rd Last PCR Sample Date",
+            THIRD_LAST_RESULT AS "1st Last PCR Result",
+            CASE
+               WHEN OUTCOME IN
+                          ('Cured with temporary disability',
+                           'Cured',
+                           'Cured with permanent disability',
+                           'Cure without disability')
+               THEN
+                  'Cured'
+               WHEN OUTCOME NOT IN
+                          ('Cured with temporary disability',
+                           'Cured',
+                           'Deceased',
+                           'Deceased (Died)',
+                           'Lost to followup',
+                           'Lost to Follow-Up',
+                           'Pending Cure',
+                           'Cured with permanent disability',
+                           'Cure without disability')
+               THEN
+                  'Infected'
+               WHEN OUTCOME = 'Lost to followup'
+                    OR OUTCOME = 'Lost to Follow-Up'
+               THEN
+                  'Lost to Follow-Up'
+               WHEN OUTCOME = 'Pending Cure'
+               THEN
+                  OUTCOME
+               ELSE
+                  NULL
+            END
+               AS "Disease status",
+            CASE
+               WHEN OUTCOME = 'ICU'
+               THEN
+                  'ICU'
+               WHEN ADMISSION_DISPOSITION IN
+                          ('ICU', 'ICU+Not Intubated', 'ICU+Intubated')
+               THEN
+                  'ICU'
+               WHEN (ADMISSION_DISPOSITION = 'Regular Ward'
+                     OR OUTCOME = 'Stable')
+               THEN
+                  'Stable'
+               ELSE
+                  NULL
+            END
+               AS "Clinical Condition",
+            ADMISSION_DISPOSITION AS "Admission disposition original",
+            Clinical_Condition AS "Current Status",
+            CASE
+               WHEN ADMISSION_TYPE IN
+                          ('Hospital',
+                           'Quarantine Facility',
+                           'Isolation Facility')
+               THEN
+                  ADMISSION_TYPE
+               WHEN ( ( (ADMISSION_DISPOSITION = 'Discharged'
+                         AND DISCHARGE_DATE IS NOT NULL)
+                       OR ADT_ID IS NULL)
+                     AND (INTV_ID IS NULL)
+                     AND (   OUTCOME NOT LIKE 'Cured%'
+                          OR OUTCOME <> 'Deceased'
+                          OR OUTCOME IS NULL))
+               THEN
+                  'Home'
+               ELSE
+                  NULL
+            END
+               AS "Current Location",
+            ADMISSION_DISPOSITION,
+            ADT_ID,
+            INTV_ID,
+            ADMISSION_TYPE AS "Admission Type Original",
+            CASE
+               WHEN INTERVENTION_SUBTYPE = 'Home'
+               THEN
+                  INTERVENTION_TYPE || ' ' || INTERVENTION_SUBTYPE
+               ELSE
+                  NULL
+            END
+               AS "Located at Home",
+            /* CASE
+                                     WHEN INTERVENTION_SUBTYPE = 'Hospital'
+                THEN
+                   'Hospitalization'
+                WHEN INTERVENTION_SUBTYPE = 'Home'
+                THEN
+                   INTERVENTION_TYPE || ' ' || INTERVENTION_SUBTYPE
+                ELSE
+                   INTERVENTION_SUBTYPE
+             END*/
+
+            TO_DATE (TO_CHAR (ADMISSION_DATE, 'DD-MON-RRRR'), 'DD-MON-RRRR')
+               AS "Admission Date",
+            ADMITTING_FACILITY AS "Current Admission Location",
+            DECODE (
+               DISCHARGE_DATE,
+               NULL,
+               DECODE (ADMISSION_DISPOSITION, 'Discharged', 'Yes', 'No'),
+               'Yes'
+            )
+               AS "DISCHARGE STATUS",
+            TO_DATE (TO_CHAR (DISCHARGE_DATE, 'DD-MON-RRRR'), 'DD-MON-RRRR')
+               AS "Discharge Date",
+            /*CASE
+                                                                                                                                                                  WHEN FIRST_RESULT = 'Detected'
+               THEN
+                  FIRST_SPECIMEN_DATE
+               WHEN SECOND_LAST_RESULT = 'Detected'
+               THEN
+                  SECOND_LAST_SPECIMEN_DATE
+               WHEN THIRD_LAST_RESULT = 'Detected'
+               THEN
+                  THIRD_LAST_SPECIMEN_DATE
+               WHEN FIRST_LAST_RESULT = 'Detected'
+               THEN
+                  FIRST_LAST_SPECIMEN_DATE
+               ELSE
+                  NULL
+            END*/
+            first_positive_pcr_d AS "START DISEASE PERIOD",
+            CASE
+               WHEN OUTCOME IN
+                          ('Cured with temporary disability',
+                           'Cured with permanent disability',
+                           'Cured without disability')
+               THEN
+                  NVL (second_negative_res_date,
+                       NVL (OUTCOME_DATE, OUTC_CREATED_ON))
+               ELSE
+                  NULL
+            END
+               AS "End Disease Period",
+            second_negative_res_date,
+            CASE
+               WHEN OUTCOME = 'Deceased' THEN MOST_OUTCONE_DECEASED
+               ELSE NULL
+            END
+               AS "Most Recent Outcome",
+            CASE
+               WHEN OUTCOME = 'Cured'
+               THEN
+                  'Cured without disability'
+               WHEN OUTCOME LIKE 'Cured%with%'
+               THEN
+                  OUTCOME
+               WHEN OUTCOME = 'Pending Cure'
+               THEN
+                  OUTCOME
+               WHEN OUTCOME = 'Lost to followup'
+                    OR OUTCOME = 'Lost to Follow-Up'
+               THEN
+                  'Lost to Follow-Up'
+               WHEN OUTCOME = 'Deceased'
+               THEN
+                  'Deceased'
+               ELSE
+                  NULL
+            END
+               AS "OutCome",
+            OUTCOME AS "OUTCOME Original",
+            CASE
+               WHEN OUTCOME = 'Deceased'
+               THEN
+                  DEATH_DATE
+               ELSE
+                  TO_DATE (TO_CHAR (OUTCOME_DATE, 'DD-MON-RRRR'),
+                           'DD-MON-RRRR')
+            END
+               AS "OutCome Date",
+            CASE
+               WHEN EMIRATES_ID IS NOT NULL THEN 'Yes'
+               ELSE UAE_RESIDENCY
+            END
+               AS "UAE Residency",
+            CASE
+               WHEN PASSPORT_NUM IS NULL THEN NULL
+               ELSE 'Passport Number'
+            END
+               AS "Passport Number",
+            PASSPORT_NUM AS "PASSPORT No",
+            CASE WHEN PREGNANCY = 'Yes' THEN 'Pregnancy ' ELSE NULL END
+            || CASE WHEN DIABETES = 'Yes' THEN 'Diabetes ' ELSE NULL END
+            || CASE
+                  WHEN CARDIACDISEASE = 'Yes' THEN 'CARDIACDISEASE '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN HYPERTENSION = 'Yes' THEN 'HYPERTENSION '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN CHRONICPULMONARY = 'Yes' THEN 'CHRONICPULMONARY '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN CHRONICLIVER = 'Yes' THEN 'CHRONICLIVER '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN CHRONICKIDNEY = 'Yes' THEN 'CHRONICKIDNEY '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN IMMUNOCOMPROMISED = 'Yes' THEN 'IMMUNOCOMPROMISED '
+                  ELSE NULL
+               END
+            || CASE
+                  WHEN UNKNOWNCONDITION = 'Yes' THEN 'UNKNOWNCONDITION '
+                  ELSE NULL
+               END
+               Comobrid,
+            NVL (patientoccupation, CLIENT_OCCUPATION) AS "Occupation",
+            ADDRESS_DETAILS AS "Address",
+            EMIRATE,
+            CITY,
+            DISTRICT,
+            AREA,
+            MAKANI,
+            DECODE (PHONE, '-', NULL, PHONE) AS "Telephone Number/s ",
+            HEALTHCARE_STAFF AS "Health care Worker/related",
+            Healthcare_Facility AS "Health care Facility",
+            Flight_Crew AS "Airline Employee",
+            AIRLINE AS "Airline Employee/related",
+            detectionfacility AS "Detection Facility/point",
+            Additional_Notes AS "Additional Notes",
+            DEATH_DATE,
+            CAUSE_OF_DEATH
+     -- CLASSIFICATION_DATE,
+
+     FROM   (  SELECT   DISTINCT
+                        INV.INVESTIGATION_ID INVESTIGATION,
+                        Inv.created_on Inv_created_on,
+                        human_subject.SUBJECT_ID,
+                        human_subject.HEALTH_CARD_NUMBER EMIRATES_ID,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     INV.PRIORITY_CODE_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           Clinical_Condition,
+                        --ENC.ENCOUNTER_ID ENCOUNTER_ID,
+                        (SELECT   LISTAGG (
+                                     CAI.ADDITIONAL_ID_VALUE,
+                                     ' , '
+                                  )
+                                     WITHIN GROUP (ORDER BY
+                                                      CAI.ADDITIONAL_ID_VALUE)
+                           FROM   CLIENT_ADDITIONAL_ID CAI
+                          WHERE   (SELECT   cd.description
+                                     FROM   REPORTNG.concept_description cd
+                                    WHERE   cd.coded_concept_id =
+                                               CAI.ADDITIONAL_ID_TYPE
+                                            AND cd.description_language = 'en'
+                                            AND cd.is_deleted_ind = 'N'
+                                            AND PUBLISH_END_DATE IS NULL) =
+                                     'EPIC ID'
+                                  AND CAI.SUBJECT_ID = human_subject.SUBJECT_ID)
+                           Salama_MRN,
+                        /*     (SELECT CAI.ADDITIONAL_ID_VALUE
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          FROM CLIENT_ADDITIONAL_ID CAI
+                                                                                                                                                                                               WHERE (SELECT cd.description
+                                                                                                                                                                                                        FROM REPORTNG.concept_description cd
+                                                                                                                                                                                                       WHERE cd.coded_concept_id =
+                                                                                                                                                                                                             CAI.ADDITIONAL_ID_TYPE
+                                                                                                                                                                                                         AND cd.description_language = 'en'
+                                                                                                                                                                                                         AND cd.is_deleted_ind = 'N'
+                                                                                                                                                                                                         AND PUBLISH_END_DATE IS NULL) =
+                                                                                                                                                                                                     'Medical record number'
+                                                                                                                                                                                                 AND CAI.SUBJECT_ID = human_subject.SUBJECT_ID) GENRIC_MRN,*/
+                        NVL (
+                           MAX(DECODE (flat.question_keyword,
+                                       'passportnum', flat.DISPLAY_TEXT_ANSWER,
+                                       NULL)),
+                           (SELECT   LISTAGG (
+                                        CAI.ADDITIONAL_ID_VALUE,
+                                        ' , '
+                                     )
+                                        WITHIN GROUP (ORDER BY
+                                                         CAI.ADDITIONAL_ID_VALUE)
+                              FROM   CLIENT_ADDITIONAL_ID CAI
+                             WHERE   (SELECT   cd.description
+                                        FROM   REPORTNG.concept_description cd
+                                       WHERE   cd.coded_concept_id =
+                                                  CAI.ADDITIONAL_ID_TYPE
+                                               AND cd.description_language =
+                                                     'en'
+                                               AND cd.is_deleted_ind = 'N'
+                                               AND PUBLISH_END_DATE IS NULL) =
+                                        'Passport number'
+                                     AND CAI.SUBJECT_ID =
+                                           human_subject.SUBJECT_ID)
+                        )
+                           AS Passport_Num,
+                        (SELECT   CAI.ADDITIONAL_ID_VALUE
+                           FROM   CLIENT_ADDITIONAL_ID CAI
+                          WHERE   (SELECT   cd.description
+                                     FROM   REPORTNG.concept_description cd
+                                    WHERE   cd.coded_concept_id =
+                                               CAI.ADDITIONAL_ID_TYPE
+                                            AND cd.description_language = 'en'
+                                            AND cd.is_deleted_ind = 'N'
+                                            AND PUBLISH_END_DATE IS NULL) =
+                                     'Case Code'
+                                  AND CAI.SUBJECT_ID = human_subject.SUBJECT_ID)
+                           CASE_CODE,
+                           SUBJECT_NAME.FIRST_NAME
+                        || ' '
+                        || subject_name.middle_name
+                        || ' '
+                        || subject_name.LAST_NAME
+                           FULL_NAME,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = gender
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           GENDER,
+                        gender GENDER_ID,
+                        NVL (
+                           (SELECT   cd.description
+                              FROM   REPORTNG.concept_description cd
+                             WHERE   cd.coded_concept_id = nationality_cncpt_id
+                                     AND cd.description_language = 'en'
+                                     AND cd.is_deleted_ind = 'N'
+                                     AND PUBLISH_END_DATE IS NULL),
+                           (SELECT   x.description
+                              -- INTO v_description, v_code
+                              FROM   immigration_information imm,
+                                     concept_description x
+                             WHERE   imm.subject_id = human_subject.SUBJECT_ID
+                                     AND imm.is_deleted_indicator = 'N'
+                                     AND imm.COUNTRY_BIRTH = x.coded_concept_id
+                                     AND x.description_language = 'en'
+                                     AND x.is_deleted_ind = 'N')
+                        )
+                           NATIONALITY,
+                        human_subject.BIRTH_DATE BOD,
+                        MAX(DECODE (flat.question_keyword,
+                                    'patientoccupation',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS patientoccupation,
+                        MAX(DECODE (flat.question_keyword,
+                                    'residency', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS UAE_Residency,
+                        CLIENT_ELECTRONIC_ADDRESS.AREA_CODE,
+                           CLIENT_ELECTRONIC_ADDRESS.AREA_CODE
+                        || '-'
+                        || CLIENT_ELECTRONIC_ADDRESS.PHONE
+                           PHONE,
+                        CASE
+                           WHEN CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_1 IS NULL
+                           THEN
+                              CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_2
+                           WHEN CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_2 IS NULL
+                           THEN
+                              CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_1
+                           WHEN CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_2 IS NULL
+                                AND CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_1 IS NULL
+                           THEN
+                              NULL
+                           ELSE
+                                 CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_1
+                              || ','
+                              || CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_2
+                        END
+                           ADDRESS_DETAILS,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = CLIENT_PHY.PROVINCE
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           EMIRATE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = CLIENT_PHY.CITY
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           CITY,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     CLIENT_PHY.DISTRICT_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           DISTRICT,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     CLIENT_PHY.AREA_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           AREA,
+                        CLIENT_PHY.MAKANI_NUMBER MAKANI,
+                        cld.CLASSN_GROUP_CODE_CNCPT_ID,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     cld.CLASSN_GROUP_CODE_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           CLASSIFICATION_GROUP,
+                        cld.CLASSIFICATION_CODE_CNCPT_ID,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     cld.CLASSIFICATION_CODE_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           CLASSIFICATION,
+                        CLD.CLASSIFICATION_DATE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     INV_HIST.DISPOSITION_CODE_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           INV_DISPOSITION,
+                        DISPOSITION_CODE_CNCPT_ID,
+                        SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_ID,
+                        SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_NAME,
+                        CASE
+                           WHEN (SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_NAME IN
+                                       ('Hasana SDL (DHA)',
+                                        'Preventative Services SDL',
+                                        'School Health Unit SDL',
+                                        'Public Health - school health',
+                                        'DHA Lab'))
+                           THEN
+                              'Public SDL'
+                           ELSE
+                              'Private SDL'
+                        END
+                           DHA_PRIVATE,
+                        -------------*** PUI DATA ****----------------------------------------------
+                        ENC.ENCOUNTER_ID,
+                        DECODE (
+                           ENC.ENCOUNTER_ID,
+                           NULL,
+                           NULL,
+                           (SELECT   cd.description
+                              FROM   REPORTNG.concept_description cd
+                             WHERE   cd.coded_concept_id = ENC.ENCOUNTER_TYPE
+                                     AND cd.description_language = 'en'
+                                     AND cd.is_deleted_ind = 'N'
+                                     AND PUBLISH_END_DATE IS NULL)
+                        )
+                           ENCOUNTER_TYPE,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'onsetdate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS ONSET_DATE,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'notificationdate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Notification_Date,
+                        MAX(DECODE (flat.question_keyword,
+                                    'receivedfromLHdate',
+                                    flat.DISPLAY_date_ANSWER,
+                                    NULL))
+                           AS Date_Received_LH,
+                        MAX(DECODE (flat.question_keyword,
+                                    'traveloutside', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Travel_History,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'arrivaldate1',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Arrival_Date1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'travelchoice1', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Travel_Country,
+                        MAX(DECODE (flat.question_keyword,
+                                    'closecontact', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Close_Contact,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'exposuredate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Close_Contact_Date,
+                        MAX(DECODE (flat.question_keyword,
+                                    'anysignsandsymptoms',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS anysignsandsymptoms,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'signfever',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'NO'
+                        END
+                           AS Fever,
+                        /* TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'feverdate', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Fever_Date,*/
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'signcough',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS Cough,
+                        /*TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'coughdate', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Cough_Date,*/
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'signthroat',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS Throat,
+                        /*TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'throatdate', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Throat_Date,*/
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'signbreath',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS Breath,
+                        /* TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'breathdate', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Breath_Date,*/
+
+                        MAX(DECODE (flat.question_keyword,
+                                    'signsandsymptoms',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Signs_Symptoms,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othersignscomment',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Other_Signs_details,
+                        MAX(DECODE (flat.question_keyword,
+                                    'flightcrew', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Flight_Crew,
+                        MAX(DECODE (flat.question_keyword,
+                                    'occupation', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_Staff,
+                        MAX(DECODE (flat.question_keyword,
+                                    'pneumonia', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Pneumonia,
+                        /*TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'datepneumonia', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Pneumonia_Date,
+                                                                                                                                                                                                                                                                                                                MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                            'pneumoniacomment', DISPLAY_TEXT_ANSWER,
+                                                                                                                                                                                                                                                                                                                            NULL))
+                                                                                                                                                                                                                                                                                                                   AS Pneumonia_Details,*/
+                        MAX(DECODE (flat.question_keyword,
+                                    'acuterespiratory',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Acute_Respiratory,
+                        /*TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'dateacute', DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS Acute_Date,
+                                                                                                                                                                                                                                                                                                                MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                            'acuterespcomment', DISPLAY_TEXT_ANSWER,
+                                                                                                                                                                                                                                                                                                                            NULL))
+                                                                                                                                                                                                                                                                                                                   AS Acute_Details,*/
+                        MAX(DECODE (flat.question_keyword,
+                                    'conditionsyesno',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Comorbid_Conditions,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'pregnancy',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS pregnancy,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'diabetes',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS diabetes,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'cardiacdisease',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS cardiacdisease,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'hypertension',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS hypertension,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'chronicpulmonary',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS chronicpulmonary,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'chronicliver',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS chronicliver,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'chronickidney',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS chronickidney,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'immunocompromised',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS immunocompromised,
+                        CASE
+                           WHEN MAX(DECODE (flat.question_keyword,
+                                            'unknowncondition',
+                                            flat.DISPLAY_NUMBER_ANSWER,
+                                            NULL)) = 1
+                           THEN
+                              'Yes'
+                           ELSE
+                              'No'
+                        END
+                           AS unknowncondition,
+                        MAX(DECODE (flat.question_keyword,
+                                    'hospitalization',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS hospitalization,
+                        /* TRUNC(MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'hospitalizationdate',
+                                                                                                                                                                                                                                                                                                                                  DISPLAY_DATE_ANSWER,
+                                                                                                                                                                                                                                                                                                                                  NULL)))
+                                                                                                                                                                                                                                                                                                                   AS hospitalizationdate,*/
+                        MAX(DECODE (flat.question_keyword,
+                                    'icu', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS icu,
+                        MAX(DECODE (flat.question_keyword,
+                                    'intubation', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS intubation,
+                        MAX(DECODE (flat.question_keyword,
+                                    'ecmo', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS ecmo,
+                        MAX(DECODE (flat.question_keyword,
+                                    'patientdied', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS patientdied,
+                        ---------***** LAB DATA **-------------------------------------------------------
+                        /* (SELECT ENCX.ENCOUNTER_ID
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  FROM ENCOUNTER ENCX
+                                                                                                                                                                                                                                                                                                                   WHERE ENCX.CREATED_ON =
+                                                                                                                                                                                                                                                                                                                         (SELECT MAX(created_on)
+                                                                                                                                                                                                                                                                                                                            FROM ENCOUNTER ENT
+                                                                                                                                                                                                                                                                                                                           WHERE
+                                                                                                                                                                                                                                                                                                                              ENT.INVESTIGATION_ID =
+                                                                                                                                                                                                                                                                                                                                 inv.INVESTIGATION_ID))
+                                                                                                                                                                                                                                                                                                                NULL LAB_ENCOUNTER_ID,*/
+                        /* (SELECT 'Lab'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             FROM ENCOUNTER ENCX
+                                                                                                                                                                                                                                                                                                                   WHERE ENCX.CREATED_ON =
+                                                                                                                                                                                                                                                                                                                         (SELECT MAX(created_on)
+                                                                                                                                                                                                                                                                                                                            FROM ENCOUNTER ENT
+                                                                                                                                                                                                                                                                                                                             where ENT.INVESTIGATION_ID =
+                                                                                                                                                                                                                                                                                                                                 inv.INVESTIGATION_ID))
+                                                                                                                                                                                                                                                                                                                NULL LAB_ENCOUNTER_TYPE,*/
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       1,
+                                                       'DATE')
+                           FIRST_LAST_RESULT_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       1,
+                                                       'RESULT')
+                           FIRST_LAST_RESULT,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       2,
+                                                       'DATE')
+                           SECOND_LAST_RESULT_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       2,
+                                                       'RESULT')
+                           SECOND_LAST_RESULT,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       3,
+                                                       'DATE')
+                           THIRD_LAST_RESULT_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       3,
+                                                       'RESULT')
+                           THIRD_LAST_RESULT,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       0,
+                                                       'DATE')
+                           FIRST_RESULT_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       0,
+                                                       'RESULT')
+                           FIRST_RESULT,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       0,
+                                                       'SPEC_DATE')
+                           FIRST_SPECIMEN_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       1,
+                                                       'SPEC_DATE')
+                           FIRST_LAST_SPECIMEN_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       2,
+                                                       'SPEC_DATE')
+                           SECOND_LAST_SPECIMEN_DATE,
+                        hasana_ll_rpt.get_lab_results (inv.INVESTIGATION_ID,
+                                                       3,
+                                                       'SPEC_DATE')
+                           THIRD_LAST_SPECIMEN_DATE,
+                        HASANA_LL_RPT.GET_1ST_POSITIVE_PCR_DATE (
+                           inv.investigation_id
+                        )
+                           first_positive_pcr_d,
+                        HASANA_LL_RPT.GET_1ST_POSITIVE_RES_DATE (
+                           inv.investigation_id
+                        )
+                           first_positive_res_d,
+                        HASANA_LL_RPT.GET_END_DISEASE_PERIOD (
+                           inv.investigation_id
+                        )
+                           second_negative_res_date,
+                        ------------------*** INTERVENTION *****-----------------------------
+
+                        /*(SELECT ENCX.ENCOUNTER_ID
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 FROM ENCOUNTER ENCX
+                                                                                                                                                                                                                                                                                                                  WHERE ENCX.CREATED_ON =
+                                                                                                                                                                                                                                                                                                                        (SELECT MAX(created_on)
+                                                                                                                                                                                                                                                                                                                           FROM ENCOUNTER ENT
+                                                                                                                                                                                                                                                                                                                          WHERE ENT.ENCOUNTER_ID = INTV.ENCOUNTER_ID))
+                                                                                                                                                                                                                                                                                                                NULL INTV_ENCOUNTER_ID,*/
+                        /*(SELECT (SELECT cd.description
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     FROM REPORTNG.concept_description cd
+                                                                                                                                                                                                                                                                                                                           WHERE cd.coded_concept_id =
+                                                                                                                                                                                                                                                                                                                                 ENCX.ENCOUNTER_TYPE
+                                                                                                                                                                                                                                                                                                                             AND cd.description_language = 'en'
+                                                                                                                                                                                                                                                                                                                             AND cd.is_deleted_ind = 'N'
+                                                                                                                                                                                                                                                                                                                             AND PUBLISH_END_DATE IS NULL)
+                                                                                                                                                                                                                                                                                                                    FROM ENCOUNTER ENCX
+                                                                                                                                                                                                                                                                                                                   WHERE ENCX.CREATED_ON =
+                                                                                                                                                                                                                                                                                                                         (SELECT MAX(created_on)
+                                                                                                                                                                                                                                                                                                                            FROM ENCOUNTER ENT
+                                                                                                                                                                                                                                                                                                                           WHERE ENT.ENCOUNTER_ID = INTV.ENCOUNTER_ID))
+                                                                                                                                                                                                                                                                                                                NULL INTV_ENCOUNTER_TYPE,*/
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id = INTV.INTERVENTION_TYPE
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           INTERVENTION_TYPE,
+                        INTV.INTERVENTION_ID INTV_ID,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     INTV.INTERVENTION_SUBTYPE
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           INTERVENTION_SUBTYPE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     INTV.INTERVENTION_DISPOSITION
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           INTERVENTION_DISPOSITION,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     intv.INTERVENTION_OTCM_CD_CNCPT_ID
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           INTERVENTION_OUTCOME,
+                        (SELECT   ENCX.ENCOUNTER_DATE
+                           FROM   ENCOUNTER ENCX
+                          WHERE   ENCX.CREATED_ON =
+                                     (SELECT   MAX (created_on)
+                                        FROM   ENCOUNTER ENT
+                                       WHERE   ENT.ENCOUNTER_ID =
+                                                  INTV.ENCOUNTER_ID)
+                                  AND INTV.ENCOUNTER_ID = ENCX.ENCOUNTER_ID)
+                           START_DATE,
+                        INTV.END_DATE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id = FOL_UP.FOLLOW_UP_TYPE
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           FOLLOW_UP_TYPE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE   cd.coded_concept_id =
+                                     FOL_UP.FOLLOW_UP_DISPOSITION
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           FOLLOW_UP_DISPOSITION,
+                        FOL_UP.FOLLOW_UP_DATE,
+                        ----------***ADT Section Data*****----------------------------------------
+                        ADT.ADMISSION_DATE ADMISSION_DATE,
+                        ADT.ADT_ID ADT_ID,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = ADT.ADMISSION_TYPE
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           ADMISSION_TYPE,
+                        (SELECT   x.SERVICE_DELIVERY_LOCATION_NAME
+                           FROM   SERVICE_DELIVERY_LOCATION x
+                          WHERE   x.SERVICE_DELIVERY_LOCATION_ID =
+                                     ADT.TRANSFER_TO)
+                           ADMITTING_FACILITY,
+                        ADT.DISCHARGE_DATE DISCHARGE_DATE,
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = ADT.DISPOSITION
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           ADMISSION_DISPOSITION,
+                        -----****** OUTCOME DATA ****---------------
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = OUTC.OUTCOME
+                                  AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL)
+                           OUTCOME,
+                        OUTC.OUTCOME_DATE,
+                        OUTC.CREATED_ON OUTC_CREATED_ON,
+                        HASANA_LL_RPT.GET_MOST_OUTCOME_DECEASED (
+                           inv.investigation_id,
+                           outc.OUTCOME_DATE,
+                           outc.CREATED_ON
+                        )
+                           MOST_OUTCONE_DECEASED,
+                        ---------------------------****** INestigation Form **--------------------------
+
+
+                        -------------------------------------------------------------
+                        Inv.created_by Inv_created_by,
+                        -------****** END OF OUT LIne List ***----------------------------------
+
+                        -- CLIENT_ELECTRONIC_ADDRESS.COUNTRY_CODE,
+                        -- CLIENT_ELECTRONIC_ADDRESS.PHONE,
+
+                        --ENC.ENCOUNTER_DATE,
+                        --inst.created_by,
+                        -- organizational_unit.ORGANIZATIONAL_UNIT_ID,
+                        /* NVL (ORGANIZATIONAL_UNIT.NAME,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ORGANIZATIONAL_UNIT.DISPLAY_NAME)
+                                                                                                                                                                                                                                                                                                                   AS Org_Name,*/
+
+                        /* USER_DEMOGRAPHICS.FIRST_NAME
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 || USER_DEMOGRAPHICS.LAST_NAME
+                                                                                                                                                                                                                                                                                                                   AS USER_NAME,*/
+                        /* ORGANIZATION_USER.PHONE_LINE1_AREA_CODE
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 || ORGANIZATION_USER.PHONE_LINE1_NUMBER
+                                                                                                                                                                                                                                                                                                                   AS PHONE_LINE1_NUMBER,*/
+                        -- ORGANIZATION_USER.CONTACT_EMAIL,
+
+                        MAX(DECODE (flat.question_keyword,
+                                    'reasonfortest', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Test_Reason,
+                        MAX(DECODE (flat.question_keyword,
+                                    'additionalnotes',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Additional_Notes,
+                        /*MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             'reporter', DISPLAY_NUMBER_ANSWER,
+                                                                                                                                                                                                                                                                                                                            NULL))
+                                                                                                                                                                                                                                                                                                                   AS reporterflag,*/
+                        MAX(DECODE (flat.question_keyword,
+                                    'healthfacility', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_Facility,
+                        MAX(DECODE (flat.question_keyword,
+                                    'intervname', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Interviewer_Name,
+                        MAX(DECODE (flat.question_keyword,
+                                    'intervphone', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Interviewer_Phone,
+                        MAX(DECODE (flat.question_keyword,
+                                    'intervemail', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Interviewer_Mail,
+                        MAX(DECODE (flat.question_keyword,
+                                    'physicianname', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Physician_Name,
+                        MAX(DECODE (flat.question_keyword,
+                                    'physicianphone', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Physician_Phone,
+                        MAX(DECODE (flat.question_keyword,
+                                    'physicianemail', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Physician_MAIL,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'traveldate1',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Travel_Date1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'traveldetails1', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Travel_Details1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'moretravel', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS More_Travel,
+                        MAX(DECODE (flat.question_keyword,
+                                    'travelchoice', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Travel_Country2,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'traveldate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Travel_Date2,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'arrivaldate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Arrival_Date2,
+                        MAX(DECODE (flat.question_keyword,
+                                    'traveldetails2', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Travel_Details2,
+                        /*MAX(DECODE (question_keyword,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             'closecontactcomment', DISPLAY_TEXT_ANSWER,
+                                                                                                                                                                                                                                                                                                                            NULL))
+                                                                                                                                                                                                                                                                                                                   AS Close_Contact_Comment,*/
+
+                        MAX(DECODE (flat.question_keyword,
+                                    'closecontactlab',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Confirmed_Contact,
+                        MAX(DECODE (flat.question_keyword,
+                                    'closecontactlabcomment',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Confirmed_Contact_Comment,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'contactexposuredate',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS Confirmed_Contact_Date,
+                        MAX(DECODE (flat.question_keyword,
+                                    'airlinename', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Airline,
+                        MAX(DECODE (flat.question_keyword,
+                                    'staffnumber', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS staff_Number,
+                        MAX(DECODE (flat.question_keyword,
+                                    'occupationmore', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_Staff_details,
+                        MAX(DECODE (flat.question_keyword,
+                                    'facility', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_facility_contact,
+                        MAX(DECODE (flat.question_keyword,
+                                    'facilitycountry',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_facility_country,
+                        MAX(DECODE (flat.question_keyword,
+                                    'facilitycity', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_facility_city,
+                        MAX(DECODE (flat.question_keyword,
+                                    'facilitycomment',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Healthcare_facility_details,
+                        MAX(DECODE (flat.question_keyword,
+                                    'patientscluster',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Patient_Cluster,
+                        MAX(DECODE (flat.question_keyword,
+                                    'clustercomment', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Patient_Cluster_details,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othersigns', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS Other_Signs,
+                        MAX(DECODE (flat.question_keyword,
+                                    'otherconditions',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS otherconditions,
+                        MAX(DECODE (flat.question_keyword,
+                                    'otherconditionscomment',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS otherconditionscomment,
+                        MAX(DECODE (flat.question_keyword,
+                                    'respiratoryill', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS respiratoryill,
+                        MAX(DECODE (flat.question_keyword,
+                                    'etiologymore', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS etiologymore,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzatype', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzatype,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzaa', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzaa,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzab', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzab,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzapcrtype',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzapcrtype,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzapcra', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzapcra,
+                        MAX(DECODE (flat.question_keyword,
+                                    'influenzapcrb', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS influenzapcrb,
+                        MAX(DECODE (flat.question_keyword,
+                                    'mers', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS mers,
+                        MAX(DECODE (flat.question_keyword,
+                                    'rsv', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS rsv,
+                        MAX(DECODE (flat.question_keyword,
+                                    'metapneumovirus',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS metapneumovirus,
+                        MAX(DECODE (flat.question_keyword,
+                                    'parainfluenza', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS parainfluenza,
+                        MAX(DECODE (flat.question_keyword,
+                                    'adenovirus', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS adenovirus,
+                        MAX(DECODE (flat.question_keyword,
+                                    'rhinovirus', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS rhinovirus,
+                        MAX(DECODE (flat.question_keyword,
+                                    'coronavirus', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS coronavirus,
+                        MAX(DECODE (flat.question_keyword,
+                                    'mpneumoniae', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS mpneumoniae,
+                        MAX(DECODE (flat.question_keyword,
+                                    'cpneumoniae', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS cpneumoniae,
+                        MAX(DECODE (flat.question_keyword,
+                                    'otherresults1', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS otherresults1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertestname1', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertestname1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertests1', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertests1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertestname2', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertestname2,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertests2', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertests2,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertesting', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertesting,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertestingname1',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertestingname1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'othertestingspec1',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS othertestingspec1,
+                        TRUNC(MAX(DECODE (flat.question_keyword,
+                                          'othertestingdate1',
+                                          flat.DISPLAY_DATE_ANSWER,
+                                          NULL)))
+                           AS othertestingdate1,
+                        MAX(DECODE (flat.question_keyword,
+                                    'detectionfacility',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS detectionfacility,
+                        MAX(DECODE (flat.question_keyword,
+                                    'detectionfacilityother',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS detectionfacilityother,
+                        MAX(DECODE (flat.question_keyword,
+                                    'airlinedetails', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS airlinedetails,
+                        MAX(DECODE (flat.question_keyword,
+                                    'flightdetails', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS flightdetails,
+                        MAX(DECODE (flat.question_keyword,
+                                    'airlinedetails2',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS airlinedetails2,
+                        MAX(DECODE (flat.question_keyword,
+                                    'flightdetails2', flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS flightdetails2,
+                        MAX(DECODE (flat.question_keyword,
+                                    'workaddressdetails',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS workaddressdetails,
+                        MAX(DECODE (flat.question_keyword,
+                                    'workaddresscountry',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS workaddresscountry,
+                        MAX(DECODE (flat.question_keyword,
+                                    'workaddressdistrict',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS workaddressdistrict,
+                        MAX(DECODE (flat.question_keyword,
+                                    'workaddressarea',
+                                    flat.DISPLAY_TEXT_ANSWER,
+                                    NULL))
+                           AS workaddressarea,
+                        -------------------------------------
+                        inv.DIAGNOSIS_DATE INVESTIGATION_DATE,
+                        ---------------------------------------------------------------
+
+                        (SELECT   (SELECT   cd.description
+                                     FROM   REPORTNG.concept_description cd
+                                    WHERE   cd.coded_concept_id = oc.OCCUPATION
+                                            AND cd.description_language = 'en'
+                                            AND cd.is_deleted_ind = 'N'
+                                            AND PUBLISH_END_DATE IS NULL)
+                           FROM   OCCUPATION OC
+                          WHERE   OC.SUBJECT_ID = human_subject.subject_id
+                                  AND oc.CREATED_ON =
+                                        (SELECT   MAX (oc1.created_on)
+                                           FROM   OCCUPATION OC1
+                                          WHERE   OC1.SUBJECT_ID =
+                                                     human_subject.subject_id))
+                           CLIENT_OCCUPATION,
+                        HUMAN_SUBJECT.DEATH_DATE,
+                                                ---------------Added by Swasti to derive the Cause of Death----------------
+                        
+                        (SELECT   cd.description
+                           FROM   REPORTNG.concept_description cd
+                          WHERE       cd.coded_concept_id = cde.cause_death
+                          AND cd.description_language = 'en'
+                                  AND cd.is_deleted_ind = 'N'
+                                  AND PUBLISH_END_DATE IS NULL) AS CAUSE_OF_DEATH
+                                    ---   
+                        
+                 FROM   INVESTIGATION INV,
+                        human_subject,
+                        ---------------Added by Swasti to derive the Cause of Death----------------
+                        cause_of_death CDE,
+
+                        subject_name,
+                        client_electronic_Address,
+                        CLIENT_ADDRESS_XREF CLENT_XREF,
+                        CLIENT_PHYSICAL_ADDRESS CLIENT_PHY,
+                        REPORTING_SOURCE RS,
+                        SERVICE_DELIVERY_LOCATION,
+                        ENCOUNTER ENC,
+                        ---Added by Heba to handle the Case class prompts on 31/3/2020
+                        DISEASE_EVENT DIS,
+                        INVESTIGATION_HISTORY INV_HIST,
+                        DISEASE_EVENT_HISTORY DIS_HIST,
+                        CLASSIFICATION_DISEAS_EVNT CLD,
+                        ADT ADT,
+                        --****** Intervention Section *****----
+                        INTERVENTION INTV,
+                        --ENCOUNTER    INTV_ENC
+                        FOLLOW_UP FOL_UP,
+                        ----**** OUTCOME Section ****--------------------------
+                        OUTCOME OUTC,
+                        (SELECT   FORM_ANSWER.FORM_INSTANCE_ID,
+                                  FORM_ANSWER.QUESTION_KEYWORD,
+                                  CASE
+                                     WHEN (FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                              'R')
+                                     THEN                             -- iTerm
+                                        (SELECT   get_iterm_desc (
+                                                     INTEGER_ANSWER,
+                                                     'en'
+                                                  )
+                                           FROM   FORM_ANSWER_INTEGER
+                                          WHERE   FORM_ANSWER_INTEGER.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     WHEN FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                             'T'
+                                          OR FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                               'M'
+                                          OR FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                               'C'
+                                     THEN
+                                        (SELECT   FORM_ANSWER_TEXT.TEXT_ANSWER
+                                           FROM   FORM_ANSWER_TEXT
+                                          WHERE   FORM_ANSWER_TEXT.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     ELSE
+                                        NULL
+                                  END
+                                     AS DISPLAY_TEXT_ANSWER,
+                                  CASE
+                                     WHEN (FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                              'I'
+                                           OR FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                                'G'
+                                           OR FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                                'B')
+                                     THEN
+                                        (SELECT   INTEGER_ANSWER
+                                           FROM   FORM_ANSWER_INTEGER
+                                          WHERE   FORM_ANSWER_INTEGER.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     WHEN FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                             'F'
+                                     THEN
+                                        (SELECT   FORM_ANSWER_FLOAT.FLOAT_ANSWER
+                                           FROM   FORM_ANSWER_FLOAT
+                                          WHERE   FORM_ANSWER_FLOAT.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     ELSE
+                                        NULL
+                                  END
+                                     AS DISPLAY_NUMBER_ANSWER,
+                                  CASE
+                                     WHEN FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                             'S'
+                                     THEN
+                                        (SELECT   FORM_ANSWER_TIMESTAMP.TIMESTAMP_ANSWER
+                                           FROM   FORM_ANSWER_TIMESTAMP
+                                          WHERE   FORM_ANSWER_TIMESTAMP.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     WHEN FORM_ANSWER.ANSWER_DATATYPE_CODE =
+                                             'D'
+                                     THEN
+                                        (SELECT   FORM_ANSWER_DATE.DATE_ANSWER
+                                           FROM   FORM_ANSWER_DATE
+                                          WHERE   FORM_ANSWER_DATE.FORM_ANSWER_ID =
+                                                     FORM_ANSWER.FORM_ANSWER_ID)
+                                     ELSE
+                                        NULL
+                                  END
+                                     AS DISPLAY_DATE_ANSWER
+                           FROM   FORM_ANSWER, FORM_INSTANCE, form_template
+                          WHERE   FORM_ANSWER.FORM_INSTANCE_ID =
+                                     FORM_INSTANCE.FORM_INSTANCE_ID
+                                  AND FORM_INSTANCE.FORM_TEMPLATE_ID =
+                                        FORM_TEMPLATE.FORM_TEMPLATE_ID
+                                  AND FORM_TEMPLATE.FORM_ID =
+                                        (SELECT   DISTINCT form_id
+                                           FROM   form_name
+                                          WHERE   form_name =
+                                                     'DHA Covid-19 PUI Form 1'))
+                        flat,
+                        reportng.FORM_INSTANCE inst
+                WHERE   flat.form_instance_id(+) = inst.form_instance_id
+                        AND CLIENT_ELECTRONIC_ADDRESS.SUBJECT_ID(+) =
+                              HUMAN_SUBJECT.SUBJECT_ID
+                        AND inst.ENCOUNTER_id(+) = ENC.ENCOUNTER_ID
+                        AND INV.SUBJECT_ID = human_subject.SUBJECT_ID(+)
+                        --  AND ACCOUNT_HOLDER.ACCOUNT_HOLDER_ID_NAME(+) = inst.created_by
+                        /*AND USER_DEMOGRAPHICS.ACCOUNT_HOLDER_ID(+) =
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACCOUNT_HOLDER.ACCOUNT_HOLDER_ID*/
+                        /*AND ORGANIZATIONAL_UNIT.ORGANIZATIONAL_UNIT_ID(+) =
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               enc.ORGANIZATIONAL_UNIT_ID*/
+                        /* AND ACCOUNT_HOLDER.ACCOUNT_HOLDER_ID =
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ORGANIZATION_USER.ACCOUNT_HOLDER_ID(+)*/
+                        AND INV.INVESTIGATION_ID = RS.INVESTIGATION_ID(+)
+                        AND RS.LOCATION_ID =
+                              SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_ID(+)
+                        AND HUMAN_SUBJECT.SUBJECT_ID = subject_name.subject_id
+                        AND CLENT_XREF.CLIENT_PHYSICAL_ADDRESS_ID =
+                              CLIENT_PHY.CLIENT_PHYSICAL_ADDRESS_ID(+)
+                        AND CLENT_XREF.PREFERRED_INDICATOR(+) = 'Y'
+                        AND CLENT_XREF.SUBJECT_ID(+) = human_subject.SUBJECT_ID
+                        ----Added by Heba to handle the Case class prompts on 31/3/2020
+                        AND ENC.INVESTIGATION_ID(+) = INV.INVESTIGATION_ID
+                        AND INV.INVESTIGATION_ID = dis.INVESTIGATION_ID(+)
+                        AND INV_HIST.INVESTIGATION_HISTORY_ID(+) =
+                              inv.INVESTIGATION_HISTORY_ID
+                        AND DIS_HIST.DISEASE_EVENT_ID(+) = DIS.DISEASE_EVENT_ID
+                        AND dis_hist.DISEASE_EVENT_HISTORY_ID =
+                              CLD.DISEASE_EVENT_HISTORY_ID(+)
+                        AND client_electronic_Address.PREFERRED_INDICATOR(+) =
+                              'Y'
+                        AND ( ( (DECODE (
+                                    HASANA_LL_RPT.GET_LAST_CLASSIFICATION_TYPE (
+                                       inv.INVESTIGATION_ID,
+                                       cld.CLASSIFICATION_DATE
+                                    ),
+                                    'M',
+                                    CLD.CREATED_ON,
+                                    'C',
+                                    CLD.CLASSIFICATION_DATE,
+                                    NULL
+                                 )) =
+                                  HASANA_LL_RPT.GET_LAST_CLASSIFICATION (
+                                     inv.INVESTIGATION_ID,
+                                     cld.CLASSIFICATION_DATE
+                                  ))
+                             OR CLD.CLASSIFICATION_DATE IS NULL)
+                        AND (SELECT   cd.description
+                               FROM   REPORTNG.concept_description cd
+                              WHERE   cd.coded_concept_id =
+                                         cld.CLASSIFICATION_CODE_CNCPT_ID
+                                      AND cd.description_language = 'en'
+                                      AND cd.is_deleted_ind = 'N'
+                                      AND PUBLISH_END_DATE IS NULL) =
+                              'Confirmed'
+                        AND (SELECT   cd.description
+                               FROM   REPORTNG.concept_description cd
+                              WHERE   cd.coded_concept_id =
+                                         cld.CLASSN_GROUP_CODE_CNCPT_ID
+                                      AND cd.description_language = 'en'
+                                      AND cd.is_deleted_ind = 'N'
+                                      AND PUBLISH_END_DATE IS NULL) = 'Case'
+                        /*AND ((SELECT cd.description
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                FROM REPORTNG.concept_description cd
+                                                                                                                                                                                                                                                 WHERE cd.coded_concept_id = ENC.ENCOUNTER_TYPE
+                                                                                                                                                                                                                                                   AND cd.description_language = 'en'
+                                                                                                                                                                                                                                                   AND cd.is_deleted_ind = 'N'
+                                                                                                                                                                                                                                                   AND PUBLISH_END_DATE IS NULL) IN ('Notification') OR
+                                                                                                                                                                                                                                               ENC.ENCOUNTER_TYPE IS NULL)*/
+
+                        AND (ENC.CREATED_ON =
+                                (SELECT   MAX (created_on)
+                                   FROM   encounter encx
+                                  WHERE   encx.investigation_id =
+                                             inv.investigation_id)
+                             OR ENC.CREATED_ON IS NULL)
+                        AND (SELECT   cd.description
+                               FROM   REPORTNG.concept_description cd
+                              WHERE   cd.coded_concept_id =
+                                         dis_hist.DISEASE_CODE_CNCPT_ID
+                                      AND cd.description_language = 'en'
+                                      AND cd.is_deleted_ind = 'N'
+                                      AND PUBLISH_END_DATE IS NULL) =
+                              'Coronavirus'
+                        -------ADT ------------------------------------
+                        AND ADT.INVESTIGATION_ID(+) = INV.INVESTIGATION_ID
+                        AND (ADT.CREATED_ON =
+                                (SELECT   MAX (ADT1.created_on)
+                                   FROM   ADT ADT1
+                                  WHERE   ADT1.INVESTIGATION_ID =
+                                             INV.INVESTIGATION_ID)
+                             OR ADT.CREATED_ON IS NULL)
+                        ---------INTERVENIOSN CONDITION----------------------
+                        AND INTV.INVESTIGATION_ID(+) = INV.INVESTIGATION_ID
+                        AND (INTV.CREATED_ON =
+                                (SELECT   MAX (INTV1.CREATED_ON)
+                                   FROM   INTERVENTION INTV1
+                                  WHERE   INTV1.INVESTIGATION_ID =
+                                             inv.INVESTIGATION_ID)
+                             OR INTV.CREATED_ON IS NULL)
+                        AND INTV.INTERVENTION_ID = FOL_UP.INTERVENTION_ID(+)
+                        --------------------OUTCOME CONDITION ------------------
+
+                        AND OUTC.INVESTIGATION_ID(+) = inv.INVESTIGATION_ID
+                        AND (OUTC.CREATED_ON =
+                                (SELECT   MAX (OUTC1.CREATED_ON)
+                                   FROM   OUTCOME OUTC1
+                                  WHERE   OUTC1.INVESTIGATION_ID =
+                                             inv.INVESTIGATION_ID)
+                             OR OUTC.CREATED_ON IS NULL)
+                        AND human_subject.SUBJECT_ID <> 1
+                        AND (CLIENT_PHY.created_on =
+                                (SELECT   MAX (CLIENT_PHY1.created_on)
+                                   FROM   CLIENT_PHYSICAL_ADDRESS CLIENT_PHY1,
+                                          CLIENT_ADDRESS_XREF CLENT_XREF1
+                                  WHERE   CLENT_XREF1.CLIENT_PHYSICAL_ADDRESS_ID =
+                                             CLIENT_PHY1.CLIENT_PHYSICAL_ADDRESS_ID
+                                          AND CLENT_XREF1.PREFERRED_INDICATOR =
+                                                'Y'
+                                          AND CLENT_XREF1.SUBJECT_ID =
+                                                human_subject.SUBJECT_ID)
+                             OR CLIENT_PHY.created_on IS NULL)
+                        AND (client_electronic_Address.created_on =
+                                (SELECT   MAX (created_on)
+                                   FROM   client_electronic_Address x
+                                  WHERE   x.SUBJECT_ID =
+                                             HUMAN_SUBJECT.SUBJECT_ID
+                                          AND x.PREFERRED_INDICATOR = 'Y')
+                             OR client_electronic_Address.created_on IS NULL)
+                /*AND ( HASANA_LL_RPT.GET_1ST_POSITIVE_PCR_DATE (
+                                                                                                                                                                                                                                                                                                                                         inv.investigation_id
+           ) IS NOT NULL and  HASANA_LL_RPT.GET_1ST_POSITIVE_PCR_DATE (
+              inv.investigation_id
+           )
+<> (TO_DATE (TO_CHAR (nvl( HASANA_LL_RPT.GET_1ST_POSITIVE_PCR_DATE (
+              inv.investigation_id
+           ),CLASSIFICATION_DATE), 'DD-MON-RRRR'),
+        'DD-MON-RRRR')))*/
+             --      AND TRUNC(INV.CREATED_ON) between TRUNC(SYSDATE) - 2 and    TRUNC(SYSDATE)
+             -- AND INV.CREATED_BY is NULL
+             /*and (subject_name.FIRST_NAME || ' ' || subject_name.middle_name ||
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           subject_name.LAST_NAME) = 'Client88 COVID100'*/
+
+             -- and (subject_name.FIRST_NAME ||' '||subject_name.middle_name || subject_name.LAST_NAME) = 'JONA CUPANGMAE'
+             --and INV.INVESTIGATION_ID = 3498
+
+             --------Added by Swasti for Cause of Death----
+            and CDE.OUTCOME_ID (+)= OUTC.OUTCOME_ID
+
+
+             GROUP BY   INST.ENCOUNTER_ID,
+                        INV.INVESTIGATION_ID,
+                        Inv.created_on,
+                        Inv.created_by,
+                        human_subject.SUBJECT_ID,
+                        subject_name.FIRST_NAME,
+                        subject_name.middle_name,
+                        subject_name.LAST_NAME,
+                        human_subject.BIRTH_DATE,
+                        gender,
+                        nationality_cncpt_id,
+                        ENC.ENCOUNTER_DATE,
+                        inst.CREATED_BY,
+                        ADT.ADT_ID,
+                        INTV.INTERVENTION_ID,
+                        --organizational_unit.ORGANIZATIONAL_UNIT_ID,
+                        /*  NVL(ORGANIZATIONAL_UNIT.NAME,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ORGANIZATIONAL_UNIT.DISPLAY_NAME),*/
+                        SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_ID,
+                        SERVICE_DELIVERY_LOCATION.SERVICE_DELIVERY_LOCATION_NAME,
+                        /*USER_DEMOGRAPHICS.FIRST_NAME ||
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          USER_DEMOGRAPHICS.LAST_NAME,*/
+                        --ORGANIZATION_USER.CONTACT_EMAIL,
+                        human_subject.HEALTH_CARD_NUMBER,
+                        /*ORGANIZATION_USER.PHONE_LINE1_AREA_CODE ||
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ORGANIZATION_USER.PHONE_LINE1_NUMBER,*/
+                        CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_1,
+                        CLIENT_PHY.INTERNATIONAL_ADDRESS_LINE_2,
+                        CLIENT_ELECTRONIC_ADDRESS.AREA_CODE,
+                        CLIENT_ELECTRONIC_ADDRESS.COUNTRY_CODE,
+                        CLIENT_ELECTRONIC_ADDRESS.PHONE,
+                        cld.CLASSN_GROUP_CODE_CNCPT_ID,
+                        cld.CLASSIFICATION_CODE_CNCPT_ID,
+                        CLD.CLASSIFICATION_DATE,
+                        ADT.ADMISSION_DATE,
+                        ADT.ADMISSION_TYPE,
+                        ADT.TRANSFER_TO,
+                        ADT.DISCHARGE_DATE,
+                        ADT.DISPOSITION,
+                        OUTC.CREATED_ON,
+                        --ENC.ENCOUNTER_TYPE,
+                        ENC.ENCOUNTER_ID,
+                        INTV.INTERVENTION_TYPE,
+                        INTV.INTERVENTION_SUBTYPE,
+                        INTV.INTERVENTION_DISPOSITION,
+                        INTV.START_DATE,
+                        INTV.END_DATE,
+                        FOL_UP.FOLLOW_UP_TYPE,
+                        FOL_UP.FOLLOW_UP_DISPOSITION,
+                        FOL_UP.FOLLOW_UP_DATE,
+                        OUTC.OUTCOME,
+                        OUTC.OUTCOME_DATE,
+                        inv.DIAGNOSIS_DATE,
+                        CLIENT_PHY.PROVINCE,
+                        CLIENT_PHY.CITY,
+                        CLIENT_PHY.MAKANI_NUMBER,
+                        CLIENT_PHY.DISTRICT_CNCPT_ID,
+                        CLIENT_PHY.AREA_CNCPT_ID,
+                        INV_HIST.DISPOSITION_CODE_CNCPT_ID,
+                        ENC.ENCOUNTER_TYPE,
+                        intv.INTERVENTION_OTCM_CD_CNCPT_ID,
+                        INTV.ENCOUNTER_ID,
+                        outcome,
+                        INV.PRIORITY_CODE_CNCPT_ID,
+                        death_date
+                        ,CAUSE_DEATH);
+
